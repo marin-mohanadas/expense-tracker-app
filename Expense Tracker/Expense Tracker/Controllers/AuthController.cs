@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Expense_Tracker.Data;
 using Expense_Tracker.Models;
-using Expense_Tracker.DTOs;
+using Expense_Tracker.DTOs.Auth;
 using Expense_Tracker.Services;
 
 namespace Expense_Tracker.Controllers;
