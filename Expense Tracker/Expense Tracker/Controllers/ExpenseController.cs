@@ -1,29 +1,46 @@
 using Expense_Tracker.Data;
+using Expense_Tracker.DTOs.Expense;
 using Expense_Tracker.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace Expense_Tracker.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class ExpenseController : ControllerBase
 {
     private readonly AppDbContext _context;
-    
+
     public ExpenseController(AppDbContext context)
     {
         _context = context;
     }
-    
-    [Authorize]
-    [HttpGet]
-    public IActionResult GetExpenses(string? filter, DateTime? start, DateTime? end)
+
+    // Helper method
+    private User GetCurrentUser()
     {
         var username = User.Identity?.Name;
-        var user = _context.Users.FirstOrDefault(u => u.Username == username);
+        return _context.Users.FirstOrDefault(u => u.Username == username);
+    }
+
+    // GET with filters
+    [HttpGet]
+    public IActionResult GetExpenses(
+        [FromQuery] string? filter,
+        [FromQuery] DateTime? start,
+        [FromQuery] DateTime? end)
+    {
+        var user = GetCurrentUser();
+        if (user == null)
+            return Unauthorized();
+
         var query = _context.Expenses
+            .AsNoTracking()
             .Where(e => e.UserId == user.UserId);
+
         var now = DateTime.UtcNow;
 
         switch (filter?.ToLower())
@@ -45,15 +62,29 @@ public class ExpenseController : ControllerBase
                 break;
         }
 
-        return Ok(query.ToList());
+        var result = query.Select(e => new ExpenseResponse
+        {
+            ExpenseId = e.ExpenseId,
+            ExpenseName = e.ExpenseName,
+            Amount = e.Amount,
+            CreatedAt = e.CreatedAt
+        }).ToList();
+
+        return Ok(result);
     }
-    
-    [Authorize]
+
+    // POST
     [HttpPost]
-    public IActionResult AddExpense([FromBody] Expense request)
+    public IActionResult AddExpense([FromBody] ExpenseRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var user = GetCurrentUser();
+        if (user == null)
+            return Unauthorized();
+
         var username = User.Identity?.Name;
-        var user = _context.Users.FirstOrDefault(u => u.Username == username);
 
         var expense = new Expense
         {
@@ -68,47 +99,71 @@ public class ExpenseController : ControllerBase
         _context.Expenses.Add(expense);
         _context.SaveChanges();
 
-        return Ok(expense);
+        var response = new ExpenseResponse
+        {
+            ExpenseId = expense.ExpenseId,
+            ExpenseName = expense.ExpenseName,
+            Amount = expense.Amount,
+            CreatedAt = expense.CreatedAt
+        };
+
+        return Ok(response);
     }
-    
-    [Authorize]
+
+    // PUT
     [HttpPut("{id:int}")]
-    public IActionResult UpdateExpense(int id, [FromBody] Expense request)
+    public IActionResult UpdateExpense(int id, [FromBody] ExpenseRequest request)
     {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var user = GetCurrentUser();
+        if (user == null)
+            return Unauthorized();
+
         var username = User.Identity?.Name;
-        var user = _context.Users.FirstOrDefault(u => u.Username == username);
+
         var expense = _context.Expenses
             .FirstOrDefault(e => e.ExpenseId == id && e.UserId == user.UserId);
-        
+
         if (expense == null)
             return NotFound();
 
         expense.ExpenseName = request.ExpenseName;
         expense.Amount = request.Amount;
-        expense.UpdatedAt = DateTime.UtcNow; // ✅ IMPORTANT
+        expense.UpdatedAt = DateTime.UtcNow;
         expense.UpdatedBy = username;
 
         _context.SaveChanges();
 
-        return Ok(expense);
+        var response = new ExpenseResponse
+        {
+            ExpenseId = expense.ExpenseId,
+            ExpenseName = expense.ExpenseName,
+            Amount = expense.Amount,
+            CreatedAt = expense.CreatedAt
+        };
+
+        return Ok(response);
     }
-    
-    [Authorize]
+
+    // DELETE
     [HttpDelete("{id:int}")]
     public IActionResult DeleteExpense(int id)
     {
-        var username = User.Identity?.Name;
-        var user = _context.Users.FirstOrDefault(u => u.Username == username);
+        var user = GetCurrentUser();
+        if (user == null)
+            return Unauthorized();
+
         var expense = _context.Expenses
             .FirstOrDefault(e => e.ExpenseId == id && e.UserId == user.UserId);
-        
+
         if (expense == null)
             return NotFound();
 
         _context.Expenses.Remove(expense);
         _context.SaveChanges();
 
-        return Ok("Deleted");
+        return Ok(new { message = "Deleted successfully" });
     }
-    
 }
