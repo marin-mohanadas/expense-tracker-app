@@ -19,7 +19,7 @@ public class ExpenseController : ControllerBase
         _context = context;
     }
 
-    // Helper method
+    // Helper: Get logged-in user
     private User GetCurrentUser()
     {
         var username = User.Identity?.Name;
@@ -31,7 +31,8 @@ public class ExpenseController : ControllerBase
     public IActionResult GetExpenses(
         [FromQuery] string? filter,
         [FromQuery] DateTime? start,
-        [FromQuery] DateTime? end)
+        [FromQuery] DateTime? end,
+        [FromQuery] int? categoryId)
     {
         var user = GetCurrentUser();
         if (user == null)
@@ -39,10 +40,12 @@ public class ExpenseController : ControllerBase
 
         var query = _context.Expenses
             .AsNoTracking()
+            .Include(e => e.Category)
             .Where(e => e.UserId == user.UserId);
 
         var now = DateTime.UtcNow;
 
+        // Time filters
         switch (filter?.ToLower())
         {
             case "week":
@@ -62,11 +65,18 @@ public class ExpenseController : ControllerBase
                 break;
         }
 
+        // Category filter
+        if (categoryId.HasValue)
+        {
+            query = query.Where(e => e.CategoryId == categoryId.Value);
+        }
+
         var result = query.Select(e => new ExpenseResponse
         {
             ExpenseId = e.ExpenseId,
-            ExpenseName = e.ExpenseName,
+            Description = e.Description,
             Amount = e.Amount,
+            CategoryName = e.Category.CategoryName,
             UpdatedAt = e.UpdatedAt
         }).ToList();
 
@@ -84,12 +94,19 @@ public class ExpenseController : ControllerBase
         if (user == null)
             return Unauthorized();
 
+        var category = _context.Set<ExpenseCategory>()
+            .FirstOrDefault(c => c.CategoryId == request.CategoryId);
+
+        if (category == null)
+            return BadRequest("Invalid category");
+
         var username = User.Identity?.Name;
 
         var expense = new Expense
         {
-            ExpenseName = request.ExpenseName,
+            Description = request.Description,
             Amount = request.Amount,
+            CategoryId = request.CategoryId,
             UserId = user.UserId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
@@ -99,15 +116,14 @@ public class ExpenseController : ControllerBase
         _context.Expenses.Add(expense);
         _context.SaveChanges();
 
-        var response = new ExpenseResponse
+        return Ok(new ExpenseResponse
         {
             ExpenseId = expense.ExpenseId,
-            ExpenseName = expense.ExpenseName,
+            Description = expense.Description,
             Amount = expense.Amount,
+            CategoryName = category.CategoryName,
             UpdatedAt = expense.UpdatedAt
-        };
-
-        return Ok(response);
+        });
     }
 
     // PUT
@@ -121,30 +137,36 @@ public class ExpenseController : ControllerBase
         if (user == null)
             return Unauthorized();
 
-        var username = User.Identity?.Name;
-
         var expense = _context.Expenses
             .FirstOrDefault(e => e.ExpenseId == id && e.UserId == user.UserId);
 
         if (expense == null)
             return NotFound();
 
-        expense.ExpenseName = request.ExpenseName;
+        var category = _context.Set<ExpenseCategory>()
+            .FirstOrDefault(c => c.CategoryId == request.CategoryId);
+
+        if (category == null)
+            return BadRequest("Invalid category");
+
+        var username = User.Identity?.Name;
+
+        expense.Description = request.Description;
         expense.Amount = request.Amount;
+        expense.CategoryId = request.CategoryId;
         expense.UpdatedAt = DateTime.UtcNow;
         expense.UpdatedBy = username;
 
         _context.SaveChanges();
 
-        var response = new ExpenseResponse
+        return Ok(new ExpenseResponse
         {
             ExpenseId = expense.ExpenseId,
-            ExpenseName = expense.ExpenseName,
+            Description = expense.Description,
             Amount = expense.Amount,
+            CategoryName = category.CategoryName,
             UpdatedAt = expense.UpdatedAt
-        };
-
-        return Ok(response);
+        });
     }
 
     // DELETE
@@ -165,5 +187,16 @@ public class ExpenseController : ControllerBase
         _context.SaveChanges();
 
         return Ok(new { message = "Deleted successfully" });
+    }
+
+    // GET Categories (helper endpoint)
+    [HttpGet("categories")]
+    public IActionResult GetCategories()
+    {
+        var categories = _context.Set<ExpenseCategory>()
+            .Select(c => new { c.CategoryId, c.CategoryName })
+            .ToList();
+
+        return Ok(categories);
     }
 }
