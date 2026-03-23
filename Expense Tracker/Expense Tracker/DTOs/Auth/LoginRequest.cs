@@ -1,4 +1,4 @@
-namespace Expense_Tracker.DTOs;
+namespace Expense_Tracker.DTOs.Auth;
 
 public class LoginRequest
 {
