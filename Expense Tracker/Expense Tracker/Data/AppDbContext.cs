@@ -11,6 +11,7 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users { get; set; }
     public DbSet<Expense> Expenses { get; set; }
+    public DbSet<ExpenseCategory> ExpenseCategories { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,7 +33,7 @@ public class AppDbContext : DbContext
         {
             entity.ToTable("ExpenseInfo");
 
-            entity.Property(e => e.ExpenseName)
+            entity.Property(e => e.Description)
                 .HasMaxLength(200)
                 .IsRequired();
 
@@ -48,6 +49,35 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.User)
                 .WithMany(u => u.Expenses)
                 .HasForeignKey(e => e.UserId);
+            
+            modelBuilder.Entity<Expense>()
+                .HasOne(e => e.Category)
+                .WithMany(c => c.Expenses)
+                .HasForeignKey(e => e.CategoryId);
         });
+
+        modelBuilder.Entity<ExpenseCategory>(entity =>
+        {
+            entity.ToTable("ExpenseCategory");
+            
+            entity.HasKey(c => c.CategoryId);
+
+            entity.Property(c => c.CategoryName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.HasIndex(c => c.CategoryName)
+                .IsUnique(); // prevents duplicates
+        });
+        
+        modelBuilder.Entity<ExpenseCategory>().HasData(
+            new ExpenseCategory { CategoryId = 1, CategoryName = "Groceries" },
+            new ExpenseCategory { CategoryId = 2, CategoryName = "Leisure" },
+            new ExpenseCategory { CategoryId = 3, CategoryName = "Electronics" },
+            new ExpenseCategory { CategoryId = 4, CategoryName = "Utilities" },
+            new ExpenseCategory { CategoryId = 5, CategoryName = "Clothing" },
+            new ExpenseCategory { CategoryId = 6, CategoryName = "Health" },
+            new ExpenseCategory { CategoryId = 7, CategoryName = "Others" }
+        );
     }
 }
