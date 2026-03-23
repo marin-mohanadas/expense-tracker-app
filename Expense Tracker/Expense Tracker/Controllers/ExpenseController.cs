@@ -67,7 +67,7 @@ public class ExpenseController : ControllerBase
             ExpenseId = e.ExpenseId,
             ExpenseName = e.ExpenseName,
             Amount = e.Amount,
-            CreatedAt = e.CreatedAt
+            UpdatedAt = e.UpdatedAt
         }).ToList();
 
         return Ok(result);
@@ -104,7 +104,7 @@ public class ExpenseController : ControllerBase
             ExpenseId = expense.ExpenseId,
             ExpenseName = expense.ExpenseName,
             Amount = expense.Amount,
-            CreatedAt = expense.CreatedAt
+            UpdatedAt = expense.UpdatedAt
         };
 
         return Ok(response);
@@ -141,7 +141,7 @@ public class ExpenseController : ControllerBase
             ExpenseId = expense.ExpenseId,
             ExpenseName = expense.ExpenseName,
             Amount = expense.Amount,
-            CreatedAt = expense.CreatedAt
+            UpdatedAt = expense.UpdatedAt
         };
 
         return Ok(response);
